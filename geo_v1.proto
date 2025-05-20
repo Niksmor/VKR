@@ -1,0 +1,531 @@
+syntax = "proto3";
+
+package geo;
+
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+
+option go_package = "./pb";
+
+// Тип поля: uuid
+message Uuid {
+  string value = 1;
+}
+
+// Стандартный ответ при создании-редактировании сущностей
+message CreateDefaultResponse {
+  Uuid uuid = 1;
+}
+
+// Категория объектов на карте
+message Category {
+  Uuid uuid = 1;
+  map<string, string> name = 2;
+  repeated SubCategory children = 3;
+}
+// Справочник: Типы подкатегорий
+enum SubCategoryType {
+  // не установлено
+  SUB_CATEGORY_TYPE_UNSPECIFIED = 0;
+  // парковка
+  SUB_CATEGORY_TYPE_PARKINGS = 1;
+  // паркомат
+  SUB_CATEGORY_TYPE_PARKOMATS = 2;
+  // терминал
+  SUB_CATEGORY_TYPE_TERMINALS = 3;
+  // инфотабло
+  SUB_CATEGORY_TYPE_SCOREBOARDS = 4;
+}
+// Справочник: Вид зоны у подкатегорий
+enum SubCategoryZoneType {
+  // не установлено
+  SUB_CATEGORY_ZONE_TYPE_UNSPECIFIED = 0;
+  // платная
+  SUB_CATEGORY_ZONE_TYPE_PAID = 1;
+  // бесплатная
+  SUB_CATEGORY_ZONE_TYPE_FREE = 2;
+}
+// Подкатегория объектов на карте
+message SubCategory {
+  Uuid uuid = 1;
+  Uuid parent_uuid = 2;
+  map<string, string> name = 3;
+  SubCategoryType type = 4;
+  SubCategoryZoneType zone_type = 5;
+}
+// Запрос на создание категории
+message CreateCategoryRequest {
+  // название категории с поддержкой интернационализации
+  map<string, string> name = 1 [(validate.rules).map.min_pairs = 1];
+}
+// Запрос на редактирование категории
+message EditCategoryRequest {
+  string uuid = 1 [(validate.rules).string.uuid = true];
+  map<string, string> name = 2 [(validate.rules).map.min_pairs = 1];
+}
+// Запрос на удаление категории
+message DeleteCategoryRequest {
+  // uuid категории для удаления
+  string uuid = 1 [(validate.rules).string.uuid = true];
+}
+// Ответ на запрос списка категорий
+message CategoryResponse {
+  repeated Category categories = 1;
+}
+// Запрос на создание подкатегории
+message CreateSubCategoryRequest {
+  // uuid родительской категории
+  Uuid parent_uuid = 1;
+  // название подкатегории с поддержкой интернационализации
+  map<string, string> name = 2 [(validate.rules).map.min_pairs = 1];
+  SubCategoryType type = 3 [(validate.rules).enum.defined_only = true];
+  SubCategoryZoneType zone_type = 4 [(validate.rules).enum.defined_only = true];
+}
+// Запрос на редактирование подкатегории
+message EditSubCategoryRequest {
+  string uuid = 1 [(validate.rules).string.uuid = true];
+  // название подкатегории с поддержкой интернационализации
+  map<string, string> name = 2 [(validate.rules).map.min_pairs = 1];
+  SubCategoryType type = 3 [(validate.rules).enum.defined_only = true];
+  SubCategoryZoneType zone_type = 4 [(validate.rules).enum.defined_only = true];
+}
+// Запрос на удаление подкатегории
+message DeleteSubCategoryRequest {
+  // uuid подкатегории для удаления
+  string uuid = 1 [(validate.rules).string.uuid = true];
+}
+
+// ЗОНЫ, ПАРКОВКИ, ПАРКОМАТЫ
+
+// Справочник: страны
+enum Country {
+  // не установлено
+  COUNTRY_UNSPECIFIED = 0;
+  // Россия
+  COUNTRY_RUSSIA = 1;
+}
+// Справочник: города
+enum City {
+  // не установлено
+  CITY_UNSPECIFIED = 0;
+  // Сочи
+  CITY_SOCHI = 1;
+}
+
+// Справочник: Тип зоны
+enum ZoneType {
+  // не установлено
+  ZONE_TYPE_UNSPECIFIED = 0;
+  // Уличная парковка (УДС)
+  ZONE_TYPE_SIMPLE = 1;
+  // Парковка с разрешениями
+  ZONE_TYPE_WITH_PERMISSION = 2;
+  // Приватная закрытая парковка
+  ZONE_TYPE_PRIVATE = 3;
+  // Плоскостная парковка (ППЗТ)
+  ZONE_TYPE_GATED = 4;
+  // Коммерческая парковка
+  ZONE_TYPE_CLOSED = 5;
+}
+// Справочник: Тип ТС
+enum VehicleType {
+  // не установлено
+  VEHICLE_TYPE_UNSPECIFIED = 0;
+  // легковой ТС
+  VEHICLE_TYPE_CAR = 1;
+  // грузовой ТС
+  VEHICLE_TYPE_TRUCK = 2;
+  // мотоцикл
+  VEHICLE_TYPE_MOTORCYCLE = 3;
+}
+// Тип поля: мин-макс цена
+message MinMaxPrice {
+  // минимальная цена в коп
+  int32 min = 1;
+  // максимальная цена в коп
+  int32 max = 2;
+}
+message VehiclePrice {
+  VehicleType vehicle_type = 1;
+  MinMaxPrice price = 2;
+}
+
+// Справочник: Виды примитивов ГЕО
+enum GisType {
+  // не установлено
+  GIS_TYPE_UNSPECIFIED = 0;
+  // Полигон
+  GIS_TYPE_POLYGON = 1;
+  // Точка
+  GIS_TYPE_POINT = 2;
+  // Линия
+  GIS_TYPE_LINE = 3;
+}
+
+// type: Point
+message Point {
+  float longitude = 1;
+  float lattitude = 2;
+}
+
+// type: Line
+message Line {
+  // 2 точки описывающае линию. длина массива всегда должна быть = 2
+  repeated Point coordinates = 2 [(validate.rules).repeated = {
+    min_items: 2
+    //max_items: 2
+  }];
+}
+
+// type: Polygon
+message Polygon {
+  repeated Point coordinates = 2;
+}
+
+// Зона на карте
+message Zone {
+  // uuid зоны
+  Uuid uuid = 1;
+  // номер зоны
+  string number = 2 [(validate.rules).string.min_len = 1];
+  // тип зоны
+  ZoneType type = 3 [(validate.rules).enum.not_ins = 0];
+  // описание зоны
+  map<string, string> description = 4 [(validate.rules).map.min_pairs = 1];
+  // город
+  City city = 5 [(validate.rules).enum.defined_only = true];
+  // Полигон покрытия зоны
+  Polygon location = 6 [(validate.rules).message.required = true];
+  // центр полигона
+  Point center = 7 [(validate.rules).message.required = true];
+  // включить - выключить зону
+  bool is_active = 8;
+  // цены в зависимости от типа ТС
+  repeated VehiclePrice prices = 9;
+  // uuid тарифа
+  Uuid tariff_uuid = 10;
+  // название таймзоны
+  string timezone = 11;
+}
+// Запрос списка зон на карте
+message GetZonesRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+// Ответ на запрос списка зон на карте
+message GetZonesResponse {
+  repeated Zone zones = 1;
+  int32 total = 2;
+}
+// Запрос списка зон по списку номеров зон
+message GetZonesByNumbersRequest {
+  repeated string numbers = 1;
+}
+// Ответ на запрос списка зон по списку номеров зон
+message GetZonesByNumbersResponse {
+  repeated Zone zones = 1;
+}
+// Запрос списка зон тарифа
+message GetZonesByTariffUuidRequest {
+  string tariff_uuid = 1;
+}
+// Ответ на запрос списка зон тарифа
+message GetZonesByTariffUuidResponse {
+  repeated Zone zones = 1;
+}
+// Запрос одной зоны
+message GetZoneRequest {
+  // uuid зоны
+  string uuid = 1 [(validate.rules).string.uuid = true];
+}
+// Ответ на запрос одной зоны
+message GetZoneResponse {
+  Zone zone = 1;
+}
+// Создание зоны
+message CreateZoneRequest {
+  // номер зоны
+  string number = 2 [(validate.rules).string.min_len = 1];
+  // тип зоны
+  ZoneType type = 3 [(validate.rules).enum.not_ins = 0];
+  // описание зоны
+  map<string, string> description = 4 [(validate.rules).map.min_pairs = 1];
+  // город
+  City city = 5 [(validate.rules).enum.defined_only = true];
+  // Полигон покрытия зоны
+  Polygon location = 6 [(validate.rules).message.required = true];
+  // центр полигона
+  Point center = 7 [(validate.rules).message.required = true];
+  // включить - выключить зону
+  bool is_active = 8;
+  // цены в зависимости от типа ТС
+  repeated VehiclePrice prices = 9;
+  // uuid тарифа
+  Uuid tariff_uuid = 10;
+}
+// Редактирование зоны
+message EditZoneRequest {
+  string uuid = 1 [(validate.rules).string.uuid = true];
+  // номер зоны
+  string number = 2 [(validate.rules).string.min_len = 1];
+  // тип зоны
+  ZoneType type = 3 [(validate.rules).enum.not_ins = 0];
+  // описание зоны
+  map<string, string> description = 4 [(validate.rules).map.min_pairs = 1];
+  // город
+  City city = 5 [(validate.rules).enum.defined_only = true];
+  // Полигон покрытия зоны
+  Polygon location = 6 [(validate.rules).message.required = true];
+  // центр полигона
+  Point center = 7 [(validate.rules).message.required = true];
+  // включить - выключить зону
+  bool is_active = 8;
+  // цены в зависимости от типа ТС
+  repeated VehiclePrice prices = 9;
+  // uuid тарифа
+  Uuid tariff_uuid = 10;
+}
+// Запрос по uuid
+message UuidRequest {
+  // uuid для удаления
+  string uuid = 1 [(validate.rules).string.uuid = true];
+}
+message Address {
+  // страна
+  Country country = 1 [(validate.rules).enum.defined_only = true];
+  // город
+  City city = 2 [(validate.rules).enum.defined_only = true];
+  // адрес
+  map<string, string> address = 3;
+  // дом
+  map<string, string> house = 4;
+}
+message ParkingLocation {
+  GisType type = 1 [(validate.rules).enum.defined_only = true];
+  oneof coordinates {
+    option (validate.required) = true;
+    Point point = 2;
+    Polygon polygon = 3;
+    Line line = 4;
+  }
+}
+// Парковка на карте
+message Parking {
+  Uuid uuid = 1;
+  ParkingLocation location = 2 [(validate.rules).message.required = true];
+  map<string, string> name = 3 [(validate.rules).map.min_pairs = 1];
+  map<string, string> description = 4 [(validate.rules).map.min_pairs = 1];
+  map<string, string> contacts = 5 [(validate.rules).map.min_pairs = 1];
+  Address address = 6 [(validate.rules).message.required = true];
+  Point center = 10 [(validate.rules).message.required = true];
+  // uuid зоны
+  Uuid zone_uuid = 11 [(validate.rules).message.required = true];
+  // uuid категории
+  Uuid category_uuid = 12 [(validate.rules).message.required = true];
+  int32 spaces_total = 13;
+  int32 spaces_handicapped = 14;
+  // название таймзоны
+  string timezone = 15;
+}
+
+
+// Запрос списка парковок на карте
+message GetParkingsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+
+  /*
+    handicap (фильтр):
+      1 - только с местами для инвалидов
+      -1 - без мест для инвалидов
+      0 - все (по умолчанию)
+  */
+  int32 handicap = 3;
+  string parking_name = 4;
+}
+// Ответ на запрос списка парковок на карте
+message GetParkingsResponse {
+  repeated Parking parkings = 1;
+  int32 total = 2;
+}
+// Ответ на запрос одной парковки
+message GetParkingResponse {
+  Parking parking = 1;
+}
+// Создание зоны
+message CreateParkingRequest {
+  ParkingLocation location = 2 [(validate.rules).message.required = true];
+  map<string, string> name = 3 [(validate.rules).map.min_pairs = 1];
+  map<string, string> description = 4 [(validate.rules).map.min_pairs = 1];
+  map<string, string> contacts = 5 [(validate.rules).map.min_pairs = 1];
+  Address address = 6 [(validate.rules).message.required = true];
+  Point center = 10 [(validate.rules).message.required = true];
+  // uuid зоны
+  Uuid zone_uuid = 11 [(validate.rules).message.required = true];
+  // uuid категории
+  Uuid category_uuid = 12 [(validate.rules).message.required = true];
+  int32 spaces_total = 13;
+  int32 spaces_handicapped = 14;
+}
+// Редактирование зоны
+message EditParkingRequest {
+  string uuid = 1 [(validate.rules).string.uuid = true];
+  ParkingLocation location = 2 [(validate.rules).message.required = true];
+  map<string, string> name = 3 [(validate.rules).map.min_pairs = 1];
+  map<string, string> description = 4 [(validate.rules).map.min_pairs = 1];
+  map<string, string> contacts = 5 [(validate.rules).map.min_pairs = 1];
+  Address address = 6 [(validate.rules).message.required = true];
+  Point center = 10 [(validate.rules).message.required = true];
+  // uuid зоны
+  Uuid zone_uuid = 11 [(validate.rules).message.required = true];
+  // uuid категории
+  Uuid category_uuid = 12 [(validate.rules).message.required = true];
+  int32 spaces_total = 13;
+  int32 spaces_handicapped = 14;
+}
+
+// Сущность кластера парковок (TBD)
+// Парковка на карте
+message ParkingFull {
+  Uuid uuid = 1;
+  ParkingLocation location = 2;
+  map<string, string> name = 3;
+  map<string, string> description = 4;
+  map<string, string> contacts = 5;
+  Address address = 6;
+  Point center = 10;
+  Zone zone = 11;
+  Category category = 12;
+  int32 spaces_total = 13;
+  int32 spaces_handicapped = 14;
+  string timezone = 15;
+}
+
+message Rectangle {
+  double left_top_longitude = 1;
+  double left_top_latitude = 2;
+  double right_bottom_longitude = 3;
+  double right_bottom_latitude = 4;
+}
+
+message Cluster {
+  Point center = 1;
+  int32 count = 2;
+  Rectangle rectangle = 3;
+}
+
+message GetParkingsByGeoFilterRequest {
+  // поисковая фраза
+  string search = 1;
+  // координаты экрана
+  Rectangle rectangle = 2 [(validate.rules).message.required = true];
+  int32 zoom = 3 [(validate.rules).int32.gte = 0];
+  /*
+    handicap (фильтр):
+      1 - только с местами для инвалидов
+      -1 - без мест для инвалидов
+      0 - все (по умолчанию)
+  */
+  int32 handicap = 4;
+}
+
+message GetParkingsByGeoFilterResponse {
+  repeated ParkingFull parkings = 1;
+  // TBD
+  repeated Cluster clusters = 2;
+}
+
+message GetParkingsFullBySearchStringRequest {
+  string search = 1;
+  Point point = 2;
+}
+// depricated
+message GetParkingsFullBySearchStringResponse {
+  repeated ParkingFull parkings = 1;
+  int32 total = 2;
+}
+message GetParkingsFullResponse {
+  repeated ParkingFull parkings = 1;
+  int32 total = 2;
+}
+
+message GetParkingsByGeoPointRequest {
+  // точка поиска (рядом с которой искать парковким)
+  Point point = 1;
+  // количесвто ближайших к точке парковок (по умолчанию = 1)
+  int32 limit = 2;
+  /*
+    handicap (фильтр):
+      1 - только с местами для инвалидов
+      -1 - без мест для инвалидов
+      0 - все (по умолчанию)
+  */
+  int32 handicap = 3;
+}
+
+message GetParkingsByGeoPointResponse {
+  repeated ParkingFull parkings = 1;
+}
+
+service Geo {
+  // Получение списка категорий и подкатегорий объектов
+  rpc Categories(google.protobuf.Empty) returns (CategoryResponse);
+  // Получение конкретной категории
+  rpc GetCategory(UuidRequest) returns (Category);
+  // Добавление категории
+  rpc CreateCategory(CreateCategoryRequest) returns (CreateDefaultResponse);
+  // Редактирование категории по uuid
+  rpc EditCategory(EditCategoryRequest) returns (CreateDefaultResponse);
+  // Удаление категории по uuid
+  rpc DeleteCategory(DeleteCategoryRequest) returns (google.protobuf.Empty);
+  // Добавление подкатегории
+  rpc CreateSubCategory(CreateSubCategoryRequest)
+    returns (CreateDefaultResponse);
+  // Получение конкретной подкатегории
+  rpc GetSubCategory(UuidRequest) returns (SubCategory);
+  // Редактирование подкатегории по uuid
+  rpc EditSubCategory(EditSubCategoryRequest) returns (CreateDefaultResponse);
+  // Удаление подкатегории по uuid
+  rpc DeleteSubCategory(DeleteSubCategoryRequest)
+    returns (google.protobuf.Empty);
+  // Получение списка зон
+  rpc Zones(GetZonesRequest) returns (GetZonesResponse);
+  // Получение списка тарифа
+  rpc ZonesByTariffUuid(GetZonesByTariffUuidRequest)
+    returns (GetZonesByTariffUuidResponse);
+  // Получение одной зоны
+  rpc Zone(GetZoneRequest) returns (GetZoneResponse);
+  // Добавление зоны
+  rpc CreateZone(CreateZoneRequest) returns (CreateDefaultResponse);
+  // Редактирование зоны по uuid
+  rpc EditZone(EditZoneRequest) returns (CreateDefaultResponse);
+  // Удаление зоны по uuid
+  rpc DeleteZone(UuidRequest) returns (google.protobuf.Empty);
+  // Получение списка зон по номерам
+  rpc GetZonesByNumbers(GetZonesByNumbersRequest) 
+    returns (GetZonesByNumbersResponse);
+  // Получение списка парковок
+  rpc Parkings(GetParkingsRequest) returns (GetParkingsResponse);
+  // Получение списка парковок с зонами
+  rpc ParkingsFull(GetParkingsRequest) returns (GetParkingsFullResponse);
+  // Получение одной парковки
+  rpc Parking(UuidRequest) returns (GetParkingResponse);
+  // Удаление парковки по uuid
+  rpc DeleteParking(UuidRequest) returns (google.protobuf.Empty);
+  // Добавление парковки
+  rpc CreateParking(CreateParkingRequest) returns (CreateDefaultResponse);
+  // Редактирование парковки по uuid
+  rpc EditParking(EditParkingRequest) returns (CreateDefaultResponse);
+  ///////////////////////////// Методы для МП
+  // Получение списка парковок по фильтру
+  rpc ParkingsFullByGeoFilter(GetParkingsByGeoFilterRequest)
+    returns (GetParkingsByGeoFilterResponse);
+  // Получение одной парковки
+  rpc ParkingFullByUuid(UuidRequest) returns (ParkingFull);
+  // Получение списка парковок по текстовому фильтру
+  rpc ParkingsFullBySearchString(GetParkingsFullBySearchStringRequest)
+    returns (GetParkingsFullBySearchStringResponse);
+  // Получение списка ближайших парковок по координатам
+  rpc ParkingsFullByGeoPoint(GetParkingsByGeoPointRequest)
+    returns (GetParkingsByGeoPointResponse);
+}

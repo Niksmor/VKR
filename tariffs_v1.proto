@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package tariffs;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+// import "validate/validate.proto";
+option go_package = "./pb";
+
+// Тип поля: uuid
+message Uuid {
+  string value = 1;
+}
+
+// Справочник: страны
+enum Country {
+  // не установлено
+  COUNTRY_UNSPECIFIED = 0;
+  // Россия
+  COUNTRY_RUSSIA = 1;
+}
+// Справочник: города
+enum City {
+  // не установлено
+  CITY_UNSPECIFIED = 0;
+  // Сочи
+  CITY_SOCHI = 1;
+}
+// Справочник: Тип ТС
+enum VehicleType {
+  // не установлено
+  VEHICLE_TYPE_UNSPECIFIED = 0;
+  // легковой ТС
+  VEHICLE_TYPE_CAR = 1;
+  // грузовой ТС
+  VEHICLE_TYPE_TRUCK = 2;
+  // мотоцикл
+  VEHICLE_TYPE_MOTORCYCLE = 3;
+  // автобус
+  VEHICLE_TYPE_BUS = 4;
+}
+message Tariff {
+  // uuid тарифа
+  Uuid uuid = 1;
+  map<string, string> name = 2;
+  map<string, string> description = 3;
+  // город
+  City city = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  message TariffPeriod {
+    int32 start = 1;
+    int32 end = 2;
+    int32 rule_group_index = 3;
+  }
+  message TariffPeriods {
+    repeated TariffPeriod weekdays = 1;
+    repeated TariffPeriod holidays = 2;
+    repeated TariffPeriod day_offs = 3;
+  }
+  TariffPeriods periods = 8;
+  message Rule {
+    VehicleType vehicle_type = 1;
+    int32 start = 2;
+    int32 end = 3;
+    int32 price = 4;
+    int32 rule_group_index = 5;
+  }
+  repeated Rule rules = 9;
+}
+// Ответ на запрос списка тарифов
+message GetTariffsResponse {
+  repeated Tariff tariffs = 1;
+}
+// Ответ на запрос одного тарифа
+message GetTariffRequest {
+  string uuid = 1;
+}
+// Ответ на запрос одного тарифа
+message GetTariffResponse {
+  Tariff tariff = 1;
+}
+
+message CalculatePriceRequest {
+  string tariff_uuid = 1;
+  int64 start = 2;
+  int64 end = 3;
+  VehicleType type = 4;
+  string vrp = 5;
+}
+message CalculatePriceResponse {
+  message CostInterval {
+    int64 start = 1;
+    int64 end = 2;
+    int64 amount = 3;
+  }
+  int64 total_cost = 1;
+  repeated CostInterval intervals = 2;
+}
+message EditTariffRequest {
+  string uuid = 1;
+  map<string, string> name = 2;
+  map<string, string> description = 3;
+}
+
+service Tariffs {
+  // Получение списка тарифов
+  rpc Tariffs(google.protobuf.Empty) returns (GetTariffsResponse) {};
+  // Получение тарифа
+  rpc Tariff(GetTariffRequest) returns (GetTariffResponse) {};
+  // Рассчет стоимости парковочной сессии
+  rpc CalculatePrice(CalculatePriceRequest) returns (CalculatePriceResponse) {};
+  // Редактирование тарифа
+  rpc EditTariff(EditTariffRequest) returns (GetTariffResponse) {};
+}

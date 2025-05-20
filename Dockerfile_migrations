@@ -1,0 +1,26 @@
+FROM golang:1.20-alpine as builder
+RUN apk add git
+
+ARG IMPARKING_GIT_USER=imprkgit
+ARG IMPARKING_GIT_PASS
+
+RUN echo "" > ~/.gitconfig
+RUN git config --add --global url."https://${IMPARKING_GIT_USER}:${IMPARKING_GIT_PASS}@git.intermb.ru".insteadOf  git://git.intermb.ru
+RUN echo "machine git.intermb.ru login ${IMPARKING_GIT_USER} password ${IMPARKING_GIT_PASS}" > ~/.netrc && chmod 600 ~/.netrc
+
+ENV GOPATH=/go
+ENV PATH=${PATH}:${GOPATH}/bin
+ENV GO111MODULE=auto
+ENV GOPRIVATE=git.intermb.ru/im/parking/imparkingplatform/*
+
+WORKDIR /build
+
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /main cmd/migrations/main.go
+FROM alpine:3
+COPY --from=builder main /bin/main
+ENTRYPOINT ["/bin/main"]

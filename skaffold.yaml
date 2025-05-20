@@ -1,0 +1,46 @@
+apiVersion: skaffold/v3
+kind: Config
+
+build:
+  artifacts:
+    - image: parkingim/b2b_gateway
+      # docker:
+      #   buildArgs:
+      #     LICENSE_UNTIL_DATE: 1681171200000
+      #     LICENSE_ENTITY_COUNT_RESTRICTION: 50
+      #     # lat1,lon1,lat2,lon2
+      #     LICENSE_RECTANGLE_RESTRICTION: 43.678504047579025,76.10542071657017,42.81719982813642,77.92091143922642
+  local:
+    push: false
+    concurrency: 1
+
+deploy:
+  helm:
+    flags:
+      upgrade: ["--timeout", "15m"]
+      install: ["--timeout", "15m"]
+    releases:
+    - name: b2bgateway
+      chartPath: deployments/helm
+      wait: true
+      #artifactOverrides:
+      #  skaffoldImage: parkingim/b2b_gateway
+      setValueTemplates:
+        skaffold: true
+        image.pullPolicy: Never
+        # внешний (который прокинется на хост) порт приложения
+        service.nodePort: 30019
+        log.level: "debug"
+# profiles:
+#   - name: mysql
+#     patches:
+#       - op: add
+#         path: /deploy/helm/releases/0/setValueTemplates/mysql.enabled
+#         value: true
+
+# portForward:
+# - resourceType: deployment
+#   resourceName: parkingim-b2b-gateway
+#   namespace: default
+#   port: 80
+#   localPort: 9091
