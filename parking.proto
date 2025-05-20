@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package parking;
+
+
+
+// Определение сообщения запроса для получения списка парковок
+message RoadsideParkingsRequest {
+  ParkingLocation location = 1;    // Фильтр по местоположению
+  string parking_type = 2;  // Тип парковки
+  string city = 3;          // Фильтр по городу
+}
+
+// Определение сообщения ответа для списка парковок
+message RoadsideParkingsResponse {
+  repeated Parking parkings = 1; // Список парковок
+}
+
+// Определение сообщения для информации о парковке
+message Parking {
+  string parking_id = 1;
+  ParkingLocation location = 2;
+  string city = 3;
+  string parking_type = 4;
+  repeated Tariff tariffs = 5; // Информация о тарифах
+}
+
+// Определение сообщения для информации о местоположении парковки
+message ParkingLocation {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+// Определение сообщения запроса для получения тарифов
+message TariffsRequest {
+  // Можно добавить поля для фильтрации тарифов, если необходимо
+}
+
+// Определение сообщения ответа для получения тарифов
+message TariffsResponse {
+  repeated Tariff tariffs = 1; // Список тарифов
+}
+
+// Определение сообщения для тарифа
+message Tariff {
+  string tariff_id = 1;
+  string name = 2;
+  repeated TariffSchedule schedules = 3; // Расписание тарифов
+}
+
+// Определение сообщения для расписания тарифа
+message TariffSchedule {
+  string day_of_week = 1;  // День недели, например "Monday"
+  string start_time = 2;   // Время начала, например "08:00"
+  string end_time = 3;     // Время окончания, например "18:00"
+  float price_per_hour = 4; // Цена за час
+}
+
+// Определение сервиса
+service ParkingService {
+  // Метод получения списка парковок
+  rpc RoadsideParkings(RoadsideParkingsRequest) returns (RoadsideParkingsResponse);
+
+  // Новый метод получения тарифов
+  rpc GetTariffs(TariffsRequest) returns (TariffsResponse);
+}
+
+message Schedule {
+  optional string monday = 1;
+  optional string tuesday = 2;
+  optional string wednesday = 3;
+  optional string thursday = 4;
+  optional string friday = 5;
+  optional string saturday = 6;
+  optional string sunday = 7;
+}
+
+message Rate {
+  required int32 rateID = 1;
+  required string description = 2;
+  required float pricePerHour = 3;
+  required string currency = 4;
+  required Schedule schedule = 5;
+}
+
+message Parking {
+  required int32 parkingID = 1;
+  required string name = 2;
+  required string location = 3;
+  repeated Rate rates = 4;
+}
+
+message GetParkingRatesRequest {
+  required int32 parkingID = 1;
+}
+
+message GetParkingRatesResponse {
+  required Parking parking = 1;
+}
+
+message ErrorResponse {
+  required string error = 1;
+}
+
+service ParkingService {
+  rpc GetParkingRates (GetParkingRatesRequest) returns (GetParkingRatesResponse);
+}

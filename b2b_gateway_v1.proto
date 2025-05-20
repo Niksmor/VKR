@@ -1,0 +1,478 @@
+syntax = "proto3";
+
+// @see https://grpc-ecosystem.github.io
+// /grpc-gateway/docs/mapping/customizing_openapi_output/
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "validate/validate.proto";
+
+
+option go_package = "./v1";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  security_definitions: {
+    security: {
+      key: "API Key"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "authorization"
+      }
+    }
+  }
+  security: {
+    security_requirement: {
+      key: "API Key"
+    }
+  }
+};
+
+message Error {
+  string code = 1;
+  string message = 2;
+  message ValidateError {
+    string field_1 = 1;
+    string message_1 = 2;
+  }
+  repeated ValidateError validate_errors = 3;
+}
+
+message HealthCheckResponse {
+  int64 ttl = 1;
+}
+
+// Справочник: Тип ТС
+enum VehicleType {
+  // не установлено
+  VEHICLE_TYPE_UNSPECIFIED = 0;
+  // легковой ТС
+  VEHICLE_TYPE_CAR = 1;
+  // грузовой ТС
+  VEHICLE_TYPE_TRUCK = 2;
+  // мотоцикл
+  VEHICLE_TYPE_MOTORCYCLE = 3;
+  // автобус
+  VEHICLE_TYPE_BUS = 4;
+}
+
+// Справочник: Тип гос. номера
+enum VrpFormat {
+  // не установлено
+  VRP_FORMAT_UNSPECIFIED = 0;
+  // внутренний
+  VRP_FORMAT_LOCAL = 1;
+  // иностранный
+  VRP_FORMAT_FOREIGN = 2;
+}
+
+message Vehicle {
+  VehicleType type = 1;
+  VrpFormat vrp_format = 2;
+  string vrp = 3;
+  string label = 4;
+  string uuid = 5;
+}
+
+// Справочник: Виды примитивов ГЕО
+enum GisType {
+  // не установлено
+  GIS_TYPE_UNSPECIFIED = 0;
+  // Полигон
+  GIS_TYPE_POLYGON = 1;
+  // Точка
+  GIS_TYPE_POINT = 2;
+  // Линия
+  GIS_TYPE_LINE = 3;
+}
+
+// type: Point
+message Point {
+  float longitude = 1;
+  float lattitude = 2;
+}
+
+// type: Line
+message Line {
+  // 2 точки описывающае линию. длина массива всегда должна быть >= 2
+  repeated Point coordinates = 1 [(validate.rules).repeated = {
+    min_items: 2
+  }];
+}
+
+// type: Polygon
+message Polygon {
+  repeated Point coordinates = 1;
+}
+
+message ParkingLocation {
+  option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_schema) = {
+    json_schema: {
+      title: "Парковка на карте"
+      description:
+        "Должно быть только одно из значений, в зависимости от type"
+    }
+  };
+  GisType type = 1 [(validate.rules).enum.defined_only = true];
+  oneof coordinates {
+    option (validate.required) = true;
+    Point point = 2;
+    Polygon polygon = 3;
+    Line line = 4;
+  }
+}
+
+
+// Запрос списка парковок 
+message RoadsideParkingsRequest {
+  ParkingLocation location = 1;    // Фильтр по местоположению
+  string parking_type = 2;  // Тип парковки
+  string city = 3;          // Фильтр по городу
+}
+
+// Расписание тарифа
+message TariffSchedule {
+  string day_of_week = 1;  // День недели, например "Monday"
+  string start_time = 2;   // Время начала, например "08:00"
+  string end_time = 3;     // Время окончания, например "18:00"
+  float price_per_hour = 4; // Цена за час
+}
+
+// Тариф
+message Tariff {
+  string tariff_id = 1;
+  string name = 2;
+  repeated TariffSchedule schedules = 3;
+}
+
+// Парковка
+message Parking {
+  string uuid = 1;
+  string name = 2;
+  string address = 3;
+  ParkingLocation location = 4;
+  Point center = 5;
+  string zone_uuid = 6;
+  string zone_number = 7;
+}
+
+// Ответ на запрос списка парковок
+message RoadsideParkingsResponse {
+  // список парковок
+  repeated Parking parkings = 1;
+  // общее количество
+  int32 total = 2;
+}
+
+// Запрос поиска парковки по названию
+message RoadsideParkingSearchRequest {
+  // Название парковки
+  string name = 1;
+}
+
+
+// Справочник: статусов сессии
+enum RoadsideSessionStatus {
+  // не установлено
+  ROADSIDE_SESSION_STATUS_UNSPECIFIED = 0;
+
+  // инициализирована
+  ROADSIDE_SESSION_STATUS_START = 1;
+  // активна
+  ROADSIDE_SESSION_STATUS_ACTIVE = 2;
+  // остановлена
+  ROADSIDE_SESSION_STATUS_STOP = 3;
+  // завершена
+  ROADSIDE_SESSION_STATUS_END = 4;
+  // отменена
+  ROADSIDE_SESSION_STATUS_CANCEL = 5;
+}
+
+enum SessionType {
+  // не установлено
+  SESSION_TYPE_UNSPECIFIED = 0;
+  // Парковачная сессия
+  SESSION_TYPE_ROADSIDE = 1;
+  // Сессия по государственному номеру
+  SESSION_TYPE_ROADSIDE_VRP = 2;
+}
+
+message RoadsideSession {
+  // uuid сессии
+  string uuid = 1;
+  // uuid пользователя
+  string user_uuid = 2;
+  // парковка
+  Parking parking = 3;
+  // транспортное средство
+  Vehicle vehicle = 4;
+  // время старта, unix timestamp (миллисекунды)
+  int64 start_time = 5;
+  // время остановки, unix timestamp (миллисекунды)
+  int64 stop_time = 6;
+  // статус
+  RoadsideSessionStatus status = 7;
+}
+
+message RoadsideSessionRequest {
+  // uuid сессии
+  string uuid = 1;
+}
+
+// Запрос расчёта стоимости парковки
+message RoadsideVrpSessionPriceRequest {
+  // uuid парковки
+  string parking_uuid = 1;
+  // время старта, unix timestamp (миллисекунды)
+  int64 start_time = 2  ;
+  // время окончания, unix timestamp (миллисекунды)
+  int64 stop_time = 3 ;
+  // тип транспортного средства
+  VehicleType vehicle_type = 4;
+  // государственный номер тс
+  string vrp = 5;
+}
+// Ответ на запрос расчёта стоимости парковки
+message RoadsideVrpSessionPriceResponse {
+  // стоимость, минимальная единица валюты
+  int64 price = 1;
+  // uuid тарифа, по которому расчитывалась цена
+  string tariff_uuid = 2;
+}
+
+// Запрос запуска сессии
+message RoadsideVrpSessionStartRequest {
+  // uuid парковки
+  string parking_uuid = 1;
+  // id пользователя
+  string user_id = 2 ;
+  // номер транспортного средства
+  string vrp = 3 ;
+  // время старта, unix timestamp (миллисекунды)
+  int64 start_time = 4 ;
+  // время окончания, unix timestamp (миллисекунды)
+  int64 stop_time = 5 ;
+  // тип транспортного средства
+  VehicleType vehicle_type = 6;
+}
+// Ответ на запуск сессии
+message RoadsideVrpSessionStartResponse {
+  // uuid сессии
+  string uuid = 1 [(validate.rules).string.min_len = 1];
+  // время окончания, unix timestamp (миллисекунды)
+  int64 stop_time = 2;
+  // стоимость, минимальная единица валюты
+  int64 price = 3;
+  // гос. номер
+  string vrp = 4 [(validate.rules).string.min_len = 1];
+  // uuid тарифа
+  string tariff_uuid = 5 [(validate.rules).string.min_len = 1];
+}
+
+// Запрос остановки сессии
+message RoadsideVrpSessionStopRequest {
+  // uuid сессии
+  string uuid = 1 [(validate.rules).string.min_len = 1];;
+  // время остановки, unix timestamp (миллисекунды)
+  int64 stop_time = 2;
+}
+
+// Ответ на окончание сессии
+message RoadsideVrpSessionStopResponse {
+  // uuid сессии
+  string uuid = 1;
+  // время остановки, unix timestamp (миллисекунды)
+  int64 stop_time = 2;
+}
+
+message RoadsideSessions {
+  // Номер парковки. Список через запятую
+  string parking_name = 1;
+  // Время старта (по UTC). Формат: ГГГГММДДЧЧММСС
+  string session_start_time = 2;
+  // Время остановки (по UTC). Формат: ГГГГММДДЧЧММСС
+  string session_stop_time = 3;
+  // Номер сессии парковки
+  string session_uuid = 4;
+  // Тип сессии
+  SessionType session_type = 5;
+  // Госномер
+  string vrp = 6;
+  // Флаг оплаты сессии
+  bool is_paid = 7;
+  // Внешний ID оплаты сессии
+  string payment_uuid = 8;
+  // uuid-ы выданных данному vrp абонементов
+  repeated string abonements = 9;
+  // uuid-ы выданных данному vrp льгот
+  repeated string benefits = 10;
+  // uuid-ы выданных данному vrp разрешений
+  repeated string permissions = 11;
+}
+
+message RoadsideSessionsRequest {
+  // max limit = 50
+  uint32 limit = 1;
+  uint32 offset = 2;
+  // Время старта (по UTC). Формат: ГГГГММДДЧЧММСС
+  string start_time = 3;
+  // Время остановки (по UTC). Формат: ГГГГММДДЧЧММСС
+  string stop_time = 4;
+  // Госномер. Список через запятую
+  string vrp = 5;
+  // Номера парковок. Список через запятую
+  string parking_name = 6;
+  // Учитывать активные сессии?
+  bool is_active_included = 7;
+}
+message RoadsideSessionsResponsePageSettings {
+  /*
+    параметры макс количества записей из запроса
+    (или дефолтные значения если превышены макс. пределы)
+  */
+  uint32 limit = 1;
+  /*
+    Заданное смещение от начальной записи.
+  */
+  uint32 offset = 2;
+  /*
+    Общее количество найденых записей
+    по заданному фильтру
+  */
+  uint32 total = 3;
+}
+
+message RoadsideSessionsResponse {
+  repeated RoadsideSessions sessions = 1;
+  RoadsideSessionsResponsePageSettings pagination = 2;
+}
+
+message CommandSmsRequest {
+  /*
+  Отправитель (номер телефона), указывается в
+  международном формате без знака «+», в формате 79ХХХХХХХХХ
+  */
+  string source = 1;
+  /*
+  Адрес получателя (например, 7377).
+  На какой номер приходят СМС на стороне оператора
+  */
+  string destination = 2;
+  // Текст сообщения. В кодировке UTF-8
+  string message = 3;
+  // Идентификатор сообщения в системе провайдера
+  string message_id = 4;
+}
+message CommandSmsResponse {
+  // Идентификатор входящего запроса
+  string request_id = 1;
+  // Код ошибки
+  int32 error_code = 2;
+  // Описание ошибки
+  string error_message = 3;
+}
+message AccountRefillExternalRequest {
+  // номер телефона пользователя 11 знаков, без +
+  string phone = 1 [(validate.rules).string.len = 11];
+  /*
+  сумма пополнения в минимальных единицах:
+  Тиы́н (теңге * 100)
+  */
+  string amount = 2;
+  /*
+  Доступные значения:
+  bank
+  */
+  string facilitator = 3 [(validate.rules).string.ins = "bank"];
+  string report = 4 [(validate.rules).string.min_len = 4];
+  string order_id = 5 [(validate.rules).string.min_len = 4];
+  /*
+  дата проведения платежа:
+  timestamp. Пример "1696386129081"
+  */
+  string data = 6;
+}
+
+message UserByPhoneRequest{
+  string phone = 1 [(validate.rules).string.len = 11];
+}
+message UserByPhoneResponse {
+  string uuid = 1;
+  Error error = 6;
+}
+
+service B2BGateway {
+  rpc Healthcheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/healthcheck"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: { } // Disable security key
+    };
+  };
+  // Получение данных по оплате
+  rpc RoadsideSessions(RoadsideSessionsRequest)
+  returns (RoadsideSessionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/roadside_sessions"
+    };
+  };
+
+  //Получение информации о парковках
+  rpc RoadsideParkings(RoadsideParkingsRequest)
+      returns (RoadsideParkingsResponse) {
+    option (google.api.http) = {
+      get: "/v1/roadside_parkings"
+    };
+  }
+  // Получение парковки по номеру
+  rpc RoadsideParkingSearch(RoadsideParkingSearchRequest) returns (Parking) {
+    option (google.api.http) = {
+      get: "/v1/roadside_parkings/search"
+    };
+  };
+  // Расчёт стоимость парковки
+  rpc RoadsideVrpSessionPrice(RoadsideVrpSessionPriceRequest)
+  returns (RoadsideVrpSessionPriceResponse) {
+    option (google.api.http) = {
+      post: "/v1/roadside_vrp_sessions/price",
+    };
+  };
+  // Старт придорожной парковочной сессии
+  rpc RoadsideVrpSessionStart(RoadsideVrpSessionStartRequest)
+  returns (RoadsideVrpSessionStartResponse) {
+    option (google.api.http) = {
+      post: "/v1/roadside_vrp_sessions/start",
+    };
+  };
+  // Остановка придорожной парковочной сессии
+  rpc RoadsideVrpSessionStop(RoadsideVrpSessionStopRequest)
+  returns (RoadsideVrpSessionStopResponse) {
+    option (google.api.http) = {
+      post: "/v1/roadside_vrp_sessions/stop",
+    };
+  };
+  // Зачисление денежных средств на лс парковочной системы
+  rpc AccountRefillExternal(AccountRefillExternalRequest)
+  returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/payments/account_refill_external",
+      body: "*"
+    };
+  };
+  // Получение uuid пользователя по телефону
+  rpc UserByPhone(UserByPhoneRequest) returns (UserByPhoneResponse) {
+    option (google.api.http) = {
+      post: "/v1/users/check",
+      body: "*"
+    };
+  };
+  // Прием СМС команд
+  rpc CommandSms(CommandSmsRequest)
+  returns (CommandSmsResponse){
+    option (google.api.http) = {
+      post: "/v1/command/sms"
+      body: "*"
+    };
+  };
+}
+
